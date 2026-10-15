@@ -1,0 +1,191 @@
+# Observability with Prometheus and Grafana: a small web server to watch, an exporter that
+# turns its numbers into metrics, the Prometheus that collects them and the Grafana that draws
+# them.
+#
+# Everything here is your own private copy and this lab has no way out to the internet, so the
+# only thing it can see is itself. Press Open on the Prometheus link to ask questions in PromQL,
+# and on the Grafana link to draw them: Grafana is signed in for you and already connected to
+# Prometheus (Connections, Data sources). Your own terminal reaches each service by its name, so
+# curl http://prometheus:9090/api/v1/query?query=nginx_up asks the same question as the page does.
+#
+# The server to watch is app, an nginx that answers every address with a line of text. The
+# exporter reads its status page and publishes what it finds on http://exporter:9113/metrics,
+# and Prometheus collects that every five seconds. Make the server busy with curl (an address
+# like http://app:8080/?n=[1-300] sends three hundred requests in one command) or break it with
+# docker stop app.
+#
+# Your task is an alerting rule. Write one into the rules folder on the prometheus service
+# (docker exec prometheus ...; the folder is /etc/prometheus/rules and any .yml in it is read),
+# reload Prometheus with curl -X POST http://prometheus:9090/-/reload, then make the server
+# misbehave and watch the alert go from pending to firing on the Alerts page. docker start app
+# puts things right and the alert clears.
+#
+# Hand in the rule, a screenshot of it firing, and a Grafana panel showing the same signal with
+# a sentence on what a person on call would do when they saw it.
+#
+# What is saved: the Prometheus configuration and your rules, and your Grafana dashboards, are
+# on volumes that survive stopping the lab. The measurements themselves are not, so a restarted
+# lab starts with an empty graph and fills again.
+
+services:
+  app:
+    image: nginx:1.27-alpine
+    user: "101"
+    # An unprivileged nginx needs a configuration it may write and ports above 1023, so it is
+    # written to /tmp and read from there: one site on 8080 and the status page on 8081, which
+    # only the exporter is meant to read.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        cat > /tmp/nginx.conf <<'CONF'
+        pid /tmp/nginx.pid;
+        error_log /dev/stderr warn;
+        events {}
+        http {
+          access_log /dev/stdout;
+          client_body_temp_path /tmp/body;
+          proxy_temp_path /tmp/proxy;
+          fastcgi_temp_path /tmp/fastcgi;
+          uwsgi_temp_path /tmp/uwsgi;
+          scgi_temp_path /tmp/scgi;
+          server {
+            listen 8080;
+            default_type text/plain;
+            location / { return 200 "hello from the example app\n"; }
+          }
+          server {
+            listen 8081;
+            location = /stub_status { stub_status; }
+          }
+        }
+        CONF
+        exec nginx -c /tmp/nginx.conf -g "daemon off;"
+    expose: ["8080", "8081"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  exporter:
+    image: nginx/nginx-prometheus-exporter:1.5.3
+    user: "1001"
+    command: ["--nginx.scrape-uri=http://app:8081/stub_status"]
+    expose: ["9113"]
+    depends_on:
+      - app
+    # The image is one static program with no shell and no tools, so it has nothing a
+    # healthcheck could run: Prometheus's own up metric is what says it answers.
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    user: "65534"
+    # The configuration is written once, on the first start, onto a volume: it is yours to
+    # change afterwards and a restart does not put it back. A marker says it was done, since
+    # the image ships a prometheus.yml of its own that would otherwise look like the lab's.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mkdir -p /etc/prometheus/rules
+        if [ ! -f /etc/prometheus/.lab-seeded ]; then
+          cat > /etc/prometheus/prometheus.yml <<'CONF'
+        # Scrape quickly and evaluate quickly, so an alert shows within seconds in a lesson.
+        global:
+          scrape_interval: 5s
+          evaluation_interval: 5s
+        # Every .yml in this folder is read, and a reload picks up a new one.
+        rule_files:
+          - /etc/prometheus/rules/*.yml
+        scrape_configs:
+          - job_name: prometheus
+            static_configs:
+              - targets: ["localhost:9090"]
+          - job_name: app
+            static_configs:
+              - targets: ["exporter:9113"]
+        CONF
+          touch /etc/prometheus/.lab-seeded
+        fi
+        exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=2h --web.enable-lifecycle
+    volumes:
+      - promconf:/etc/prometheus
+    expose: ["9090"]
+    depends_on:
+      - exporter
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    labels:
+      lab.title: Prometheus
+      lab.open: "9090"
+
+  grafana:
+    image: grafana/grafana:13.2.4
+    user: "472"
+    environment:
+      # Signed in for you, as the one person who uses this copy.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      # Nothing here can reach the internet, so do not try to: no plugin downloads, no update
+      # checks, no usage reports and no news feed.
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    # The data source is provisioned by a file written before Grafana starts, so it opens
+    # already connected to Prometheus.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        cat > /etc/grafana/provisioning/datasources/prometheus.yml <<'CONF'
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            uid: prometheus
+            type: prometheus
+            access: proxy
+            url: http://prometheus:9090
+            isDefault: true
+        CONF
+        exec /run.sh
+    volumes:
+      - grafanadata:/var/lib/grafana
+    expose: ["3000"]
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    labels:
+      lab.title: Grafana, already signed in and connected to Prometheus
+      lab.open: "3000"
+
+volumes:
+  promconf:
+  grafanadata:

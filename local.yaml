@@ -1,0 +1,9 @@
+# Publishes the lab on your own machine only (127.0.0.1), for running it outside the platform:
+#   docker compose -f compose.yaml -f local.yaml up
+services:
+  prometheus:
+    ports: ["127.0.0.1:9090:9090"]
+  grafana:
+    ports: ["127.0.0.1:3000:3000"]
+  app:
+    ports: ["127.0.0.1:8080:8080"]
