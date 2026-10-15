@@ -75,7 +75,7 @@ The lab has no way out to the internet, so nothing can be downloaded into it, Gr
 ## Troubleshooting
 
 - **The Grafana page is blank straight after Start.** Wait a few seconds and press Open again: the lab reports itself ready only once Prometheus answers, and Grafana follows it.
-- **The alert never appears after the reload.** Look at **Status, Rules** in Prometheus: a file that is not valid YAML shows its error there. Rules are read from `/etc/prometheus/rules/*.yml` only.
+- **The alert never appears after the reload.** A rule file with a mistake in it makes the reload fail: `curl -s -X POST http://prometheus:9090/-/reload` prints "failed to reload config", and Prometheus keeps the rules it had before. The reason is in the service's log (`docker logs prometheus`). Rules are read from `/etc/prometheus/rules/*.yml` only.
 - **On your own machine, port 9090, 3000 or 8080 is already in use.** Change the left-hand numbers in `local.yaml` and open those ports instead.
 
 ## Checking the lab
