@@ -1,5 +1,7 @@
 # Prometheus and Grafana observability lab with Docker Compose: write an alerting rule in a private copy
 
+[English](README.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Español](README.es.md)
+
 [![check](https://github.com/mitsurutech/lab-observability/actions/workflows/check.yml/badge.svg)](https://github.com/mitsurutech/lab-observability/actions/workflows/check.yml)
 
 A ready-made **monitoring and observability lab** for classrooms, from the [MitsuruTech Learning Platform](https://mitsurutech.co.uk/learning), where schools and colleges give every student their own databases, containers and terminal in the browser. Each student gets their own copy of a small web server to watch, **Prometheus** collecting its metrics and **Grafana** drawing them, already connected, and then **writes an alerting rule** in Prometheus, breaks the server on purpose and watches the alert go from pending to firing. It suits a first introduction to monitoring, PromQL, dashboards and alerting in a DevOps, operations or cloud unit, with nothing installed and no risk to anybody else's machine.
@@ -90,10 +92,14 @@ test/check.sh
 
 [nginx](https://nginx.org) is BSD-2-Clause, the [NGINX Prometheus exporter](https://github.com/nginx/nginx-prometheus-exporter) and [Prometheus](https://github.com/prometheus/prometheus) are Apache-2.0, and [Grafana](https://github.com/grafana/grafana) is AGPL-3.0. They are run unmodified from their own images and are not distributed here. The images are `nginx:1.27-alpine`, `nginx/nginx-prometheus-exporter:1.5.3`, `prom/prometheus:v3.13.4` and `grafana/grafana:13.2.4`.
 
-The compose file, the tests and this documentation are MIT licensed, see [LICENSE](LICENSE): copy it, change it, teach with it. The applications inside keep the licence of their own projects, linked above.
+The compose file, the tests and this documentation are ours and are covered by the [Licence](#licence) below. The applications inside keep the licence of their own projects, linked above.
 
 ## About
 
 Made by [Mitsuru Technologies](https://mitsurutech.co.uk) for the [MitsuruTech Learning Platform](https://mitsurutech.co.uk/learning): Python, Java, Go, Node, SQL and Linux in the browser for schools and colleges, with container labs, web apps deployed from GitHub, and quizzes that mark themselves. Try code with no account in the [playground](https://mitsurutech.co.uk/playground). The [help manual](https://mitsurutech.co.uk/help/labs) lists every lab.
 
 More labs from the same place: [lab-juice-shop](https://github.com/mitsurutech/lab-juice-shop), [lab-dvwa](https://github.com/mitsurutech/lab-dvwa), [lab-webgoat](https://github.com/mitsurutech/lab-webgoat), [lab-mysql-phpmyadmin](https://github.com/mitsurutech/lab-mysql-phpmyadmin), [lab-git-gitea](https://github.com/mitsurutech/lab-git-gitea) and [lab-sample](https://github.com/mitsurutech/lab-sample).
+
+## Licence
+
+This work is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). You may share it and adapt it for learning and teaching, if you credit Mitsuru Technologies Ltd, do not use it commercially, and share anything you make from it under the same licence. The full text is in the `LICENSE` file.
